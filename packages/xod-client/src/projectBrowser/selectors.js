@@ -5,6 +5,7 @@ import { createSelector } from 'reselect';
 import * as XP from 'xod-project';
 
 import { createMemoizedSelector } from '../utils/selectorTools';
+import { patchListEqualsBy } from '../utils/memoizedSelectorsTools';
 import * as ProjectSelectors from '../project/selectors';
 import { isPatchDeadTerminal } from '../project/utils';
 
@@ -54,7 +55,7 @@ const getLocalPatchesList = createSelector(
 
 export const getLocalPatches = createMemoizedSelector(
   [getLocalPatchesList, ProjectSelectors.getProject],
-  [R.equals],
+  [patchListEqualsBy(XP.haveAddedNodesOrChangedTypesOrBoundValues)],
   (patches, project) =>
     R.compose(
       R.sortBy(XP.getPatchPath),

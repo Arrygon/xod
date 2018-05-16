@@ -20,6 +20,10 @@ import {
 import { isPatchDeadTerminal, getRenderablePinType } from '../project/utils';
 
 import { createMemoizedSelector } from '../utils/selectorTools';
+import {
+  patchListEqualsBy,
+  maybePatchEqualsBy,
+} from '../utils/memoizedSelectorsTools';
 
 import { missingPatchForNode } from './messages';
 
@@ -70,8 +74,25 @@ export const getCurrentPatch = createSelector(
   (patchPath, project) => R.chain(XP.getPatchByPath(R.__, project), patchPath)
 );
 
-export const getDeducedPinTypes = createSelector(
+const projectPatchesEquals = R.either(
+  (a, b) => a === b,
+  R.useWith(patchListEqualsBy(XP.haveAddedNodesOrChangedTypesOrBoundValues), [
+    XP.listPatches,
+    XP.listPatches,
+  ])
+);
+
+export const getDeducedPinTypes = createMemoizedSelector(
   [getProject, getCurrentPatch],
+  [
+    projectPatchesEquals,
+    maybePatchEqualsBy(
+      R.both(
+        R.complement(XP.haveAddedNodesOrChangedTypesOrBoundValues),
+        R.useWith(R.equals, [XP.listLinks, XP.listLinks])
+      )
+    ),
+  ],
   (project, maybeCurrentPatch) =>
     foldMaybe({}, patch => XP.deducePinTypes(patch, project), maybeCurrentPatch)
 );

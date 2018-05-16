@@ -180,6 +180,8 @@ export const removeImpl = def(
 //
 // =============================================================================
 
+const getNodes = R.prop('nodes');
+
 /**
  * Checks that node id to be equal specified value
  *
@@ -201,7 +203,7 @@ export const nodeIdEquals = def(
  */
 export const listNodes = def(
   'listNodes :: Patch -> [Node]',
-  R.compose(R.values, R.prop('nodes'))
+  R.compose(R.values, getNodes)
 );
 
 /**
@@ -1564,5 +1566,86 @@ export const checkSpecializationMatchesAbstraction = def(
     }
 
     return Either.of(specializationPatch);
+  }
+);
+
+// =============================================================================
+//
+// Functions that checks could something change in the Patch
+//
+// =============================================================================
+
+// :: StrMap Node -> Set Node
+const getSetOfNodeIds = R.pipe(R.keys, a => new Set(a));
+
+/**
+ * Checks is Patch has some changes over the Nodes that
+ * could affect on generic pin deduction or marked as
+ * "deprecated", "utility" or "dead".
+ *
+ * True if have changes.
+ */
+export const haveAddedNodesOrChangedTypesOrBoundValues = def(
+  'haveAddedNodesOrChangedTypesOrBoundValues :: Patch -> Patch -> Boolean',
+  (prevPatch, nextPatch) => {
+    // If same objects — nothing changed
+    if (prevPatch === nextPatch) return false;
+
+    // If same nodes maps — nothing changed
+    const prevNodes = getNodes(prevPatch);
+    const nextNodes = getNodes(nextPatch);
+    if (prevNodes === nextNodes) return false;
+
+    const prevNodeKeys = getSetOfNodeIds(prevNodes);
+    const nextNodeKeys = getSetOfNodeIds(nextNodes);
+    const diffNodeKeys = new Set(
+      [...prevNodeKeys].filter(x => !nextNodeKeys.has(x))
+    );
+    // If there is some nodes added
+    if (diffNodeKeys.size > 0) return true;
+
+    const prevNodesList = R.values(prevNodes);
+
+    // If any Node has change of Type or BoundValue
+    return R.any(prevNode => {
+      const nodeId = Node.getNodeId(prevNode);
+      const nextNode = nextNodes[nodeId];
+      if (prevNode === nextNode) return false;
+
+      const prevNodeType = Node.getNodeType(prevNode);
+      const nextNodeType = Node.getNodeType(nextNode);
+      if (prevNodeType !== nextNodeType) return true;
+
+      const prevBoundValues = Node.getAllBoundValues(prevNode);
+      const nextBoundValues = Node.getAllBoundValues(nextNode);
+      if (prevBoundValues !== nextBoundValues) return true;
+
+      // If something else changed (E.G. position) — nothing changed
+      return false;
+    })(prevNodesList);
+  }
+);
+
+/**
+ * Checks is Patch has some changes over the Nodes,
+ * including check above (`haveAddedNodesOrChangedTypesOrBoundValues`)
+ * and in addition checks Node position.
+ *
+ * True if have changes.
+ */
+export const haveAddedOrChangedNodes = def(
+  'haveAddedOrChangedNodes :: Patch -> Patch -> Boolean',
+  (prevPatch, nextPatch) => {
+    if (haveAddedNodesOrChangedTypesOrBoundValues(prevPatch, nextPatch))
+      return true;
+
+    const prevNodesMap = getNodes(prevPatch);
+    const nextNodesMap = getNodes(nextPatch);
+
+    return R.any(prevNode => {
+      const nodeId = Node.getNodeId(prevNode);
+      const nextNode = nextNodesMap[nodeId];
+      return Node.getNodePosition(prevNode) !== Node.getNodePosition(nextNode);
+    })(R.values(prevNodesMap));
   }
 );

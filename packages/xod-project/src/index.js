@@ -62,6 +62,8 @@ export {
   isDeprecatedPatch,
   getDeprecationReason,
   isUtilityPatch,
+  haveAddedNodesOrChangedTypesOrBoundValues,
+  haveAddedOrChangedNodes,
 } from './patch';
 export {
   getFilename as getAttachmentFilename,
