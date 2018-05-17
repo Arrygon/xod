@@ -651,6 +651,53 @@ describe('Patch', () => {
         assert.deepEqual({ inStr: '""', outNum: '0' }, pinDefaultValues);
       });
     });
+
+    describe('output-self terminals', () => {
+      it('should produce output pin with the type named after constructor patch', () => {
+        const testPatch = Helper.defaultizePatch({
+          path: '@/my-custom-type',
+          nodes: {
+            outSelf: {
+              type: CONST.OUTPUT_SELF_PATH,
+              position: { x: 0, y: 100 },
+            },
+          },
+        });
+
+        const pin = R.compose(R.head, Patch.listOutputPins)(testPatch);
+
+        assert.equal(Pin.getPinType(pin), '@/my-custom-type');
+      });
+      it('should allow more than one output-self pins', () => {
+        const testPatch = Helper.defaultizePatch({
+          path: '@/my-custom-type',
+          nodes: {
+            outSelf: {
+              type: CONST.OUTPUT_SELF_PATH,
+              position: { x: 0, y: 100 },
+            },
+            outSelf2: {
+              type: CONST.OUTPUT_SELF_PATH,
+              position: { x: 100, y: 100 },
+            },
+            outSelf3: {
+              type: CONST.OUTPUT_SELF_PATH,
+              position: { x: 200, y: 100 },
+            },
+          },
+        });
+
+        const pinTypes = R.compose(R.map(Pin.getPinType), Patch.listOutputPins)(
+          testPatch
+        );
+
+        assert.deepEqual(pinTypes, [
+          '@/my-custom-type',
+          '@/my-custom-type',
+          '@/my-custom-type',
+        ]);
+      });
+    });
   });
 
   describe('comments', () => {

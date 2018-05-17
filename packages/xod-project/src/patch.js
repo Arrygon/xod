@@ -26,12 +26,14 @@ import { def } from './types';
 import {
   getHardcodedPinsForPatchPath,
   getPinKeyForTerminalDirection,
+  getCustomTypeTerminalPins,
 } from './builtInPatches';
 import {
   getBaseName,
   getLocalPath,
   getLibraryName,
   isTerminalPatchPath,
+  getTerminalDataType,
   isDeferNodeType,
   resolvePatchPath,
   isBuiltInLibName,
@@ -319,12 +321,16 @@ const compareNodesPositionAxis = axis =>
 // :: Patch -> Node -> Number -> Pin
 const createPinFromTerminalNode = R.curry((patch, node, order) => {
   const direction = Node.getPinNodeDirection(node);
-  const type = Node.getPinNodeDataType(node);
+  const isOutputSelf = Node.getPinNodeDataType(node) === 'self';
+  const type = isOutputSelf
+    ? getPatchPath(patch)
+    : Node.getPinNodeDataType(node);
 
   const isBindable =
     direction === CONST.PIN_DIRECTION.INPUT
       ? true // inputs are always bindable
       : canBindToOutputs(patch) &&
+        !isOutputSelf &&
         type !== CONST.PIN_TYPE.PULSE &&
         !Utils.isGenericType(type);
   const defaultValue = Node.getBoundValue(
@@ -368,12 +374,21 @@ const computePins = R.memoizeWith(pinsMemoizer, patch =>
   )(patch)
 );
 
-// :: Patch -> StrMap Pins
-const getPins = R.ifElse(
-  patchHasHardcodedPins,
-  getHardcodedPinsForPatch,
-  computePins
+const isCustomTypeTerminalPatch = R.compose(
+  R.ifElse(
+    isTerminalPatchPath,
+    R.pipe(getTerminalDataType, R.complement(Utils.isBuiltInType)),
+    R.F
+  ),
+  getPatchPath
 );
+
+// :: Patch -> StrMap Pins
+const getPins = R.cond([
+  [patchHasHardcodedPins, getHardcodedPinsForPatch],
+  [isCustomTypeTerminalPatch, R.pipe(getPatchPath, getCustomTypeTerminalPins)],
+  [R.T, computePins],
+]);
 
 /**
  * Returns pin object by key

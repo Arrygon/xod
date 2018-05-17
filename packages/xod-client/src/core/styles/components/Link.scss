@@ -10,12 +10,12 @@
 
 .Link {
   .line {
-    stroke: $color-datatype-generic;
+    stroke: $color-datatype-custom;
     stroke-width: 2px;
   }
 
   .end {
-    fill:  $color-datatype-generic;
+    fill: $color-datatype-custom;
   }
 
   &.string {
@@ -35,6 +35,10 @@
 
   &.pulse {
     @include link-parts-coloring($color-datatype-pulse);
+  }
+
+  &.t1, &.t2, &.t3 {
+    @include link-parts-coloring($color-datatype-generic);
   }
 
   &.is-selected, &.is-dead.is-selected {

@@ -21,11 +21,11 @@
 .Pin {
   .symbol {
     fill: $color-pin-fill;
-    stroke: $color-datatype-generic;
+    stroke: $color-datatype-custom;
     stroke-width: 2px;
 
     &.is-connected {
-      fill: $color-datatype-generic;
+      fill: $color-datatype-custom;
     }
 
     &.hasConflictingBoundValue {
@@ -50,6 +50,10 @@
 
     &.byte {
       @include symbol-coloring($color-datatype-byte);
+    }
+
+    &.t1, &.t2, &.t3 {
+      @include symbol-coloring($color-datatype-generic);
     }
 
     &.dead, &.is-invalid {

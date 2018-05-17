@@ -106,18 +106,29 @@ const WIDGET_MAPPING = {
   },
 };
 
-export const getNodeWidgetConfig = type =>
-  isGenericType(type)
-    ? {
-        component: GenericPinWidget,
-        props: {
-          type,
-          keyDownHandlers: submitOnEnter,
-          // normalize only almost valid byte values
-          normalizeValue: normalizeGenericValue,
-        },
-      }
-    : WIDGET_MAPPING[type];
+export const getNodeWidgetConfig = R.cond([
+  [
+    isGenericType,
+    type => ({
+      component: GenericPinWidget,
+      props: {
+        type,
+        keyDownHandlers: submitOnEnter,
+        // normalize only almost valid byte values
+        normalizeValue: normalizeGenericValue,
+      },
+    }),
+  ],
+  [R.has(R.__, WIDGET_MAPPING), R.prop(R.__, WIDGET_MAPPING)],
+  // This must be a custom type then
+  [
+    R.T,
+    type => ({
+      component: DisabledInputWidget,
+      props: { type },
+    }),
+  ],
+]);
 
 export default {
   HintWidget,

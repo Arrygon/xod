@@ -2,6 +2,7 @@ import * as R from 'ramda';
 import { Either, Maybe } from 'ramda-fantasy';
 import {
   foldMaybe,
+  foldEither,
   catMaybies,
   explodeMaybe,
   explodeEither,
@@ -9,6 +10,8 @@ import {
   isAmong,
   notNil,
   noop,
+  maybeProp,
+  memoizeOnlyLast,
   fail,
   failOnFalse,
   failOnNothing,
@@ -16,7 +19,8 @@ import {
 } from 'xod-func-tools';
 import { BUILT_IN_PATCH_PATHS } from './builtInPatches';
 
-import * as Tools from './func-tools';
+import * as CONST from './constants';
+
 import * as Link from './link';
 import * as Node from './node';
 import * as Patch from './patch';
@@ -25,7 +29,6 @@ import * as PatchPathUtils from './patchPathUtils';
 import { def } from './types';
 import * as Utils from './utils';
 import { deducePinTypes } from './typeDeduction';
-import { foldEither } from '../../xod-func-tools/dist/monads';
 
 /**
  * Root of a project’s state tree
@@ -178,7 +181,37 @@ export const BUILT_IN_PATCHES = R.compose(
 // :: String -> Boolean
 export const isPathBuiltIn = R.flip(R.contains)(BUILT_IN_PATCH_PATHS);
 
-const getPatches = R.compose(R.merge(BUILT_IN_PATCHES), R.prop('patches'));
+const isConstructorPatch = R.compose(
+  R.any(R.equals(CONST.OUTPUT_SELF_PATH)),
+  R.map(Node.getNodeType),
+  Patch.listNodes
+);
+
+// :: Project -> Map PatchPath Patch
+const getPatches = memoizeOnlyLast(project => {
+  // TODO: better name.
+  // It must be clear that those are not built-in or auto-generated patches
+  const assignedPatches = R.prop('patches', project);
+
+  const customTypeTerminals = R.compose(
+    R.indexBy(Patch.getPatchPath),
+    R.chain(constructorPatchPath =>
+      R.compose(
+        R.map(terminalPath =>
+          Patch.setPatchPath(terminalPath, Patch.createPatch())
+        ),
+        R.map(
+          PatchPathUtils.getCustomTypeTerminalPath(R.__, constructorPatchPath)
+        )
+      )([CONST.PIN_DIRECTION.INPUT, CONST.PIN_DIRECTION.OUTPUT])
+    ),
+    R.map(Patch.getPatchPath),
+    R.values,
+    R.filter(isConstructorPatch)
+  )(assignedPatches);
+
+  return R.mergeAll([assignedPatches, BUILT_IN_PATCHES, customTypeTerminals]);
+});
 
 /**
  * @function lensPatch
@@ -206,7 +239,16 @@ export const listPatches = def(
 export const listPatchesWithoutBuiltIns = def(
   'listPatches :: Project -> [Patch]',
   R.compose(
-    R.reject(R.compose(isAmong(BUILT_IN_PATCH_PATHS), Patch.getPatchPath)),
+    R.reject(
+      // TODO: extract to separate util?
+      R.compose(
+        R.anyPass([
+          isAmong(BUILT_IN_PATCH_PATHS),
+          PatchPathUtils.isTerminalPatchPath,
+        ]),
+        Patch.getPatchPath
+      )
+    ),
     R.values,
     R.prop('patches')
   )
@@ -304,7 +346,7 @@ export const listMissingLibraryNames = def(
  */
 export const getPatchByPath = def(
   'getPatchByPath :: PatchPath -> Project -> Maybe Patch',
-  (path, project) => R.compose(Tools.prop(path), getPatches)(project)
+  (path, project) => R.compose(maybeProp(path), getPatches)(project)
 );
 
 /**

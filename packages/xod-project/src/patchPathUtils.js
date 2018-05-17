@@ -100,7 +100,20 @@ export const getTerminalDirection = R.compose(
 
 export const getTerminalDataType = def(
   'getTerminalDataType :: PatchPath -> DataType',
-  R.compose(R.nth(2), R.match(terminalPatchPathRegExp))
+  terminalPatchPath => {
+    const baseType = R.match(terminalPatchPathRegExp, terminalPatchPath)[2];
+
+    // using isBuiltInType from ./utils here won't catch
+    // stuff like `someone/my-lib/number`
+    const isBuiltInPrimitiveType = R.startsWith(
+      `${PATCH_NODES_LIB_NAME}/`,
+      terminalPatchPath
+    );
+
+    return isBuiltInPrimitiveType
+      ? baseType
+      : `${getLibraryName(terminalPatchPath)}/${baseType}`;
+  }
 );
 
 // :: String -> Boolean
@@ -115,9 +128,19 @@ export const isOutputTerminalPath = R.compose(
   getTerminalDirection
 );
 
-// ::
+// :: PinDirection -> DataType -> PatchPath
 export const getTerminalPath = R.curry(
   (direction, type) => `${PATCH_NODES_LIB_NAME}/${direction}-${type}`
+);
+
+// :: PinDirection -> PatchPath -> PatchPath
+export const getCustomTypeTerminalPath = R.curry(
+  (direction, constructorPatchPath) => {
+    const libraryName = getLibraryName(constructorPatchPath);
+    const typeName = getBaseName(constructorPatchPath);
+
+    return `${libraryName}/${direction}-${typeName}`;
+  }
 );
 
 //
